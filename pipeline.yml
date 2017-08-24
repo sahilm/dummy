@@ -1,0 +1,46 @@
+resources:
+- name: 30s
+  type: time
+  source: {interval: 30s}
+- name: dummy
+  type: git
+  source:
+    uri: git@github.com:sahilm/dummy
+    branch: master
+    private_key: ((private_key))
+
+jobs:
+- name: do
+  plan:
+  - get: 30s
+  - get: dummy
+    trigger: true
+  - task: do
+    config:
+      inputs:
+      - name: "30s"
+      - name: dummy
+      outputs:
+      - name: updated-dummy
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: ruby}
+      run:
+        path: bash
+        args:
+        - -c
+        - |
+          set -e
+          cp -r dummy/{.[^.],}* updated-dummy/
+          cp 30s/input updated-dummy/time
+          cd updated-dummy
+          git config --global user.email "nobody@concourse.ci"
+          git config --global user.name "Concourse"
+          git add .
+          git commit -m "Bumped time"
+  
+  - put: dummy
+    params:
+      repository: updated-dummy
+      rebase: true
